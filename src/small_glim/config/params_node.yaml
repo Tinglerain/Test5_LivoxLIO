@@ -1,0 +1,18 @@
+/**:
+  ros__parameters:
+    node:
+      debug: false # if true, the node will print debug information
+      enable_mapping: true # if true, the node will perform mapping
+      enable_tf_publish: true # if true, the node will publish tf transforms (odom <- imu <- lidar)
+      imu_time_offset: 0.0 # time offset to be added to the imu timestamps (in seconds)
+      lidar_time_offset: 0.0 # time offset to be added to the lidar timestamps (in seconds)
+      acc_scale: 9.80665 # scale factor for the accelerometer measurements
+      imu_sub_topic: "/livox/imu"
+      lidar_sub_topic: "/livox/lidar/pointcloud"
+      odometry_pub_topic: "/small_glim/odometry"
+      path_pub_topic: "/small_glim/path"
+      registered_cloud_pub_topic: "/small_glim/registered_cloud"
+      ivox_cloud_pub_topic: "/small_glim/ivox_cloud"
+      imu_frame_id: "imu_link"
+      lidar_frame_id: "lidar_link"
+      odometry_frame_id: "odom"

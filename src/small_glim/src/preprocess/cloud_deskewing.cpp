@@ -1,0 +1,147 @@
+#include <small_glim/preprocess/cloud_deskewing.hpp>
+#include <small_glim/common/logger.hpp>
+#include <small_glim/common/pose_utils.hpp>
+#include <gtsam/geometry/Pose3.h>
+
+#include <algorithm>
+#include <cmath>
+
+namespace small_glim {
+
+std::vector<Eigen::Vector4d> CloudDeskewing::deskew(
+    const Eigen::Isometry3d& T_imu_lidar,
+    const Eigen::Vector3d& linear_vel,
+    const Eigen::Vector3d& angular_vel,
+    const std::vector<double>& times,
+    const std::vector<Eigen::Vector4d>& points
+) {
+    if (times.empty()) {
+        return std::vector<Eigen::Vector4d>();
+    }
+    if (!std::isfinite(times.front()) || !std::isfinite(times.back()) || times.back() < times.front() || times.back() - times.front() > 1.0) {
+        logger::warn(
+            "cloud_deskewing",
+            "skip deskewing due to invalid timestamp range front={:.6f} back={:.6f}",
+            times.front(),
+            times.back()
+        );
+        return points;
+    }
+
+    const Eigen::Isometry3d T_lidar_imu = T_imu_lidar.inverse();
+    const gtsam::Vector6 vel = (gtsam::Vector6() << angular_vel, linear_vel).finished();
+
+    const double time_eps = 1e-4; // 0.1msec
+    std::vector<double> time_table;
+    std::vector<size_t> time_indices;
+
+    time_table.reserve(static_cast<size_t>((times.back() - times.front()) / time_eps * 1.2));
+    time_indices.reserve(points.size());
+
+    for (const double time : times) {
+        if (time_table.empty() || time - time_table.back() > time_eps) {
+            time_table.push_back(time);
+        }
+        time_indices.push_back(time_table.size() - 1);
+    }
+
+    std::vector<Eigen::Isometry3d> T_lidar0_lidar1(time_table.size());
+    for (size_t i = 0; i < time_table.size(); i++) {
+        const double dt = time_table[i];
+        // Maybe this is not correct. Need to check.
+        const Eigen::Isometry3d T_imu1_imu0(gtsam::Pose3::Expmap(dt * vel).matrix());
+        T_lidar0_lidar1[i] = T_lidar_imu * T_imu1_imu0.inverse() * T_imu_lidar;
+    }
+
+    std::vector<Eigen::Vector4d> deskewed(points.size());
+    for (size_t i = 0; i < points.size(); i++) {
+        const auto& T_l0_l1 = T_lidar0_lidar1[time_indices[i]];
+        deskewed[i] = T_l0_l1 * points[i];
+    }
+
+    return deskewed;
+}
+std::vector<Eigen::Vector4d> CloudDeskewing::deskew(
+    const Eigen::Isometry3d& T_imu_lidar,
+    const std::vector<double>& imu_times,
+    const std::vector<Eigen::Isometry3d>& imu_poses,
+    const double stamp,
+    const std::vector<double>& times,
+    const std::vector<Eigen::Vector4d>& points
+) {
+    if (times.empty()) {
+        return std::vector<Eigen::Vector4d>();
+    }
+    if (!std::isfinite(times.front()) || !std::isfinite(times.back()) ||
+        times.back() < times.front() || times.back() - times.front() > 1.0) {
+        logger::warn(
+            "cloud_deskewing",
+            "skip deskewing due to invalid timestamp range front={:.6f} back={:.6f}",
+            times.front(),
+            times.back());
+        return points;
+    }
+
+    if (imu_poses.empty() || imu_times.empty()) {
+        return deskew(
+            T_imu_lidar,
+            Eigen::Vector3d::Zero(),
+            Eigen::Vector3d::Zero(),
+            times,
+            points);
+    }
+
+    constexpr double time_eps = 1e-4;
+    std::vector<double> time_table;
+    std::vector<std::size_t> time_indices;
+    time_table.reserve(
+        static_cast<std::size_t>((times.back() - times.front()) / time_eps * 1.2));
+    time_indices.reserve(times.size());
+
+    for (const double time : times) {
+        if (time_table.empty() || time - time_table.back() > time_eps) {
+            time_table.push_back(time);
+        }
+        time_indices.push_back(time_table.size() - 1);
+    }
+
+    const Eigen::Isometry3d T_lidar_imu = T_imu_lidar.inverse();
+    std::vector<Eigen::Isometry3d> T_lidar0_lidar1(time_table.size());
+
+    std::size_t imu_cursor = 0;
+    Eigen::Isometry3d T_imu0_world = Eigen::Isometry3d::Identity();
+
+    for (std::size_t i = 0; i < time_table.size(); ++i) {
+        const double time = stamp + time_table[i];
+
+        while (imu_cursor + 1 < imu_times.size() &&
+               imu_times[imu_cursor + 1] < time) {
+            ++imu_cursor;
+        }
+
+        if (i == 0) {
+            T_imu0_world = imu_poses[imu_cursor].inverse();
+        }
+
+        Eigen::Isometry3d T_world_imu1 = imu_poses[imu_cursor];
+        if (imu_cursor + 1 < imu_times.size()) {
+            const double imu_t0 = imu_times[imu_cursor];
+            const double imu_t1 = imu_times[imu_cursor + 1];
+            const double ratio = std::clamp(
+                (time - imu_t0) / (imu_t1 - imu_t0), 0.0, 1.0);
+            T_world_imu1 = interpolatePose(
+                imu_poses[imu_cursor], imu_poses[imu_cursor + 1], ratio);
+        }
+
+        const Eigen::Isometry3d T_imu0_imu1 = T_imu0_world * T_world_imu1;
+        T_lidar0_lidar1[i] = T_lidar_imu * T_imu0_imu1 * T_imu_lidar;
+    }
+
+    std::vector<Eigen::Vector4d> deskewed(points.size());
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        deskewed[i] = T_lidar0_lidar1[time_indices[i]] * points[i];
+    }
+    return deskewed;
+}
+
+} // namespace small_glim

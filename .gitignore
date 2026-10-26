@@ -1,0 +1,8 @@
+build/
+install/
+log/
+__pycache__/
+*.pyc
+bag/*.mcap
+map/mapping_*/
+bag/metadata.yaml
