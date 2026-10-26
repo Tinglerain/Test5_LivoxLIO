@@ -118,7 +118,9 @@ ros2 launch small_glim small_glim.launch.py
 
 建议按推荐顺序实现表格中的第 1 至第 5 项。位姿插值（TODO 1）虽然只有几行代码，但它是已提供去畸变模块的前置函数，务必先写对。
 
-仅修改上表列出的 3 个源文件；不要修改已提供的 `cloud_deskewing.cpp`、IMU 预积分、因子图、GICP、iVox 及节点骨架。已有演示视频：
+仅修改上表列出的 3 个源文件；不要修改已提供的 `cloud_deskewing.cpp`、IMU 预积分、因子图、GICP、iVox 及节点骨架。
+
+如果函数没写或写错，可能的结果可见演示视频：
 
 - [interpolatePose](./video/interpolatePose.mp4)
 - [computeCovariance](./video/computeCovariance.mp4)
