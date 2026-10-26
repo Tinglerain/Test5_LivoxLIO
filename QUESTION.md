@@ -129,14 +129,20 @@ source install/setup.bash
 
 ## 六、提交
 
-- 修改的 3 个 `.cpp` 文件：
-  - `src/small_glim/src/common/pose_utils.cpp`
-  - `src/small_glim/src/preprocess/cloud_ops.cpp`
-  - `src/small_glim/src/odometry/initial_attitude.cpp`
 - Foxglove 的屏幕录像；
-- 简短报告：
-  - 每个 TODO 对应 LIO 的哪一步；
-  - 实现错误时对应的现象；
-  - 去畸变、GICP 协方差、初始姿态分别如何影响地图质量。
+- 报告：
+  - 关于这个 Test，你学到了什么？做的过程中压力如何？
+  - 你有使用AI辅助吗，如果有，你是如何使用的？
+  - 经过这 5 个 Test 的学习，你有什么收获，能否理解视觉组在团队中的作用？
 
 不要提交 `build/`、`install/`、`log/`、`map/mapping_*/` 和原始录包。
+
+把整个.zip发到：
+
+```text
+2759879494@qq.com
+```
+祝顺利 😊😊😊
+
+<div align="right">—— 浙江大学 RoboMaster 算法组</div>
+
